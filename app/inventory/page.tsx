@@ -4,6 +4,8 @@ import { InventoryForm } from "@/components/inventory-form";
 import { InventoryTable } from "@/components/inventory-table";
 import { getInventoryItems, getInventorySummary, getIphoneModels } from "@/lib/inventory";
 
+export const dynamic = "force-dynamic";
+
 export default async function InventoryPage() {
   const [items, models, stats] = await Promise.all([
     getInventoryItems(),

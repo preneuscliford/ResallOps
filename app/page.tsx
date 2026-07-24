@@ -4,6 +4,8 @@ import { SourceSyncPanel } from "@/components/source-sync-panel";
 import { getOpportunities, getOpportunitySummary } from "@/lib/opportunities";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [opportunities, stats] = await Promise.all([
     getOpportunities(),
