@@ -1,0 +1,2 @@
+export const ACQUISITION_BUDGET_MIN = 5;
+export const ACQUISITION_BUDGET_MAX = 100;
