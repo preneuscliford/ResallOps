@@ -1,6 +1,7 @@
-import * as cheerio from "cheerio";
 import { ACQUISITION_BUDGET_MAX, ACQUISITION_BUDGET_MIN } from "@/lib/budget";
+import { appEnv, hasEbayEnv } from "@/lib/env";
 import { isEligibleIphoneModel } from "@/lib/market-pricing";
+import { SafeError } from "@/lib/api-error";
 
 export type EbayListing = {
   title: string;
@@ -9,109 +10,126 @@ export type EbayListing = {
   subtitle: string;
 };
 
-export async function fetchEbayListings(query: string, limit = 12) {
-  const url = buildEbaySearchUrl(query);
-  const response = await fetch(url, {
+type EbayItemSummary = {
+  title?: string;
+  itemWebUrl?: string;
+  price?: { value?: string };
+  condition?: string;
+};
+
+type EbaySearchResponse = {
+  itemSummaries?: EbayItemSummary[];
+};
+
+type EbayTokenResponse = {
+  access_token: string;
+  expires_in: number;
+};
+
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+async function getEbayAccessToken(): Promise<string> {
+  if (!hasEbayEnv()) {
+    throw new SafeError(
+      "eBay n'est pas configure. Ajoutez EBAY_CLIENT_ID et EBAY_CLIENT_SECRET.",
+    );
+  }
+
+  if (cachedToken && cachedToken.expiresAt > Date.now()) {
+    return cachedToken.value;
+  }
+
+  const credentials = Buffer.from(
+    `${appEnv.ebayClientId}:${appEnv.ebayClientSecret}`,
+  ).toString("base64");
+
+  const response = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+    method: "POST",
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-      "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
     },
-    cache: "no-store",
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      scope: "https://api.ebay.com/oauth/api_scope",
+    }),
     signal: AbortSignal.timeout(10_000),
   });
+
+  if (!response.ok) {
+    throw new Error(`Authentification eBay refusee (statut ${response.status}).`);
+  }
+
+  const payload = (await response.json()) as EbayTokenResponse;
+
+  cachedToken = {
+    value: payload.access_token,
+    expiresAt: Date.now() + (payload.expires_in - 60) * 1000,
+  };
+
+  return cachedToken.value;
+}
+
+export async function fetchEbayListings(query: string, limit = 12): Promise<EbayListing[]> {
+  const token = await getEbayAccessToken();
+
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(Math.min(limit * 4, 200)),
+    filter: `price:[${ACQUISITION_BUDGET_MIN}..${ACQUISITION_BUDGET_MAX}],priceCurrency:USD,conditionIds:{7000},buyingOptions:{FIXED_PRICE}`,
+  });
+
+  const response = await fetch(
+    `https://api.ebay.com/buy/browse/v1/item_summary/search?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+        "Accept-Language": "en-US",
+      },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`eBay a repondu avec le statut ${response.status}.`);
   }
 
-  const html = await response.text();
-  return parseEbaySearchResults(html, limit);
-}
-
-export function parseEbaySearchResults(html: string, limit = 12): EbayListing[] {
-  const $ = cheerio.load(html);
+  const payload = (await response.json()) as EbaySearchResponse;
   const seenUrls = new Set<string>();
   const listings: EbayListing[] = [];
 
-  $("li.s-card").each((_, element) => {
+  for (const item of payload.itemSummaries ?? []) {
     if (listings.length >= limit) {
-      return false;
+      break;
     }
 
-    const card = $(element);
-    const rawTitle = card.find(".s-card__title").first().text().trim();
-    const rawPrice = card.find(".s-card__price").first().text().trim();
-    const url = card.find(".s-card__link").first().attr("href")?.trim();
-    const subtitle = card.find(".s-card__subtitle").first().text().trim();
+    const title = item.title?.trim();
+    const url = item.itemWebUrl;
+    const askingPrice = item.price?.value ? Math.round(Number.parseFloat(item.price.value)) : 0;
+    const subtitle = item.condition ?? "";
 
-    const title = cleanTitle(rawTitle);
-    const askingPrice = extractPrice(rawPrice);
-
-    if (!title || !url || !askingPrice) {
-      return;
-    }
-
-    if (title === "Shop on eBay" || seenUrls.has(url)) {
-      return;
+    if (!title || !url || !askingPrice || seenUrls.has(url)) {
+      continue;
     }
 
     if (!/iphone/i.test(title)) {
-      return;
+      continue;
     }
 
     if (!isEligibleIphoneModel(title)) {
-      return;
-    }
-
-    if (askingPrice < ACQUISITION_BUDGET_MIN || askingPrice > ACQUISITION_BUDGET_MAX) {
-      return;
+      continue;
     }
 
     if (isBulkListing(title)) {
-      return;
+      continue;
     }
 
     seenUrls.add(url);
-    listings.push({
-      title,
-      url,
-      askingPrice,
-      subtitle,
-    });
-  });
-
-  return listings;
-}
-
-function buildEbaySearchUrl(query: string) {
-  const params = new URLSearchParams({
-    _nkw: query,
-    LH_BIN: "1",
-    _sop: "10",
-    LH_ItemCondition: "7000",
-  });
-
-  return `https://www.ebay.com/sch/i.html?${params.toString()}`;
-}
-
-function cleanTitle(title: string) {
-  return title
-    .replace(/^New Listing/i, "")
-    .replace(/Opens in a new window or tab/gi, "")
-    .replace(/\(\d+\)\s*$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractPrice(priceLabel: string) {
-  const match = priceLabel.match(/([\d,]+(?:\.\d{2})?)/);
-
-  if (!match) {
-    return 0;
+    listings.push({ title, url, askingPrice, subtitle });
   }
 
-  return Math.round(Number.parseFloat(match[1].replace(/,/g, "")));
+  return listings;
 }
 
 export function isBulkListing(title: string) {
