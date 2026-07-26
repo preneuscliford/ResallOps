@@ -112,19 +112,23 @@ export function InventoryTable({ items, models }: InventoryTableProps) {
                     </div>
                     <div className="table-subtitle">{item.color ?? "Couleur non renseignée"}</div>
                   </td>
-                  <td>{item.status}</td>
-                  <td>{formatCurrency(item.purchasePrice)}</td>
-                  <td>{formatCurrency(item.repairCost)}</td>
-                  <td>{item.salePrice === null ? "-" : formatCurrency(item.salePrice)}</td>
-                  <td>{item.saleMargin === null ? "-" : formatCurrency(item.saleMargin)}</td>
-                  <td>
+                  <td data-label="Statut">{item.status}</td>
+                  <td data-label="Achat">{formatCurrency(item.purchasePrice)}</td>
+                  <td data-label="Réparation">{formatCurrency(item.repairCost)}</td>
+                  <td data-label="Vente">
+                    {item.salePrice === null ? "-" : formatCurrency(item.salePrice)}
+                  </td>
+                  <td data-label="Marge">
+                    {item.saleMargin === null ? "-" : formatCurrency(item.saleMargin)}
+                  </td>
+                  <td data-label="Suivi">
                     <div className="table-subtitle">
                       Achat : {formatDate(item.purchaseDate)}
                       <br />
                       {item.imei ? `Réf. : ${item.imei}` : "Réf. non renseignée"}
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Actions">
                     <div className="table-actions">
                       <button
                         className="button-secondary"

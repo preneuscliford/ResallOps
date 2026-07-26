@@ -28,18 +28,18 @@ export function OpportunityBoard({ opportunities }: OpportunityBoardProps) {
                   {opportunity.platform} • {opportunity.location}
                 </div>
               </td>
-              <td>{formatCurrency(opportunity.askingPrice)}</td>
-              <td>{formatCurrency(opportunity.resaleEstimate)}</td>
-              <td>{formatCurrency(opportunity.estimatedMargin)}</td>
-              <td>
+              <td data-label="Prix">{formatCurrency(opportunity.askingPrice)}</td>
+              <td data-label="Revente">{formatCurrency(opportunity.resaleEstimate)}</td>
+              <td data-label="Marge">{formatCurrency(opportunity.estimatedMargin)}</td>
+              <td data-label="Risque">
                 <span className={`badge badge-${opportunity.riskLevel.toLowerCase()}`}>
                   {opportunity.riskLevel}
                 </span>
               </td>
-              <td>
+              <td data-label="Score">
                 <strong>{opportunity.score}/100</strong>
               </td>
-              <td>{opportunity.recommendedAction}</td>
+              <td data-label="Action">{opportunity.recommendedAction}</td>
             </tr>
           ))}
         </tbody>
