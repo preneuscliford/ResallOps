@@ -5,7 +5,8 @@ export const appEnv = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   ebayClientId: process.env.EBAY_CLIENT_ID,
   ebayClientSecret: process.env.EBAY_CLIENT_SECRET,
-};
+  ebayEnv: process.env.EBAY_ENV === "sandbox" ? "sandbox" : "production",
+} as const;
 
 export function hasSupabaseBrowserEnv() {
   return Boolean(appEnv.supabaseUrl && appEnv.supabaseAnonKey);

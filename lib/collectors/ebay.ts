@@ -26,6 +26,9 @@ type EbayTokenResponse = {
   expires_in: number;
 };
 
+const EBAY_API_BASE =
+  appEnv.ebayEnv === "sandbox" ? "https://api.sandbox.ebay.com" : "https://api.ebay.com";
+
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
 async function getEbayAccessToken(): Promise<string> {
@@ -43,7 +46,7 @@ async function getEbayAccessToken(): Promise<string> {
     `${appEnv.ebayClientId}:${appEnv.ebayClientSecret}`,
   ).toString("base64");
 
-  const response = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+  const response = await fetch(`${EBAY_API_BASE}/identity/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
@@ -80,7 +83,7 @@ export async function fetchEbayListings(query: string, limit = 12): Promise<Ebay
   });
 
   const response = await fetch(
-    `https://api.ebay.com/buy/browse/v1/item_summary/search?${params.toString()}`,
+    `${EBAY_API_BASE}/buy/browse/v1/item_summary/search?${params.toString()}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
