@@ -4,9 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { InventoryItem, IphoneModel } from "@/types/inventory";
 
+type InventoryFormPrefill = {
+  modelId?: string;
+  purchasePrice?: string;
+  notes?: string;
+};
+
 type InventoryFormProps = {
   models: IphoneModel[];
   item?: InventoryItem;
+  prefill?: InventoryFormPrefill;
   submitUrl?: string;
   method?: "POST" | "PATCH";
   submitLabel?: string;
@@ -32,19 +39,23 @@ const colorOptions = [
   "Corail",
 ];
 
-function createInitialForm(models: IphoneModel[], item?: InventoryItem) {
+function createInitialForm(
+  models: IphoneModel[],
+  item?: InventoryItem,
+  prefill?: InventoryFormPrefill,
+) {
   const today = new Date().toISOString().slice(0, 10);
 
   return {
-    modelId: item?.modelId ?? models[0]?.id ?? "",
+    modelId: item?.modelId ?? prefill?.modelId ?? models[0]?.id ?? "",
     storageGb: String(item?.storageGb ?? 128),
     color: item?.color ?? "",
     status: item?.status ?? "En stock",
-    purchasePrice: item ? String(item.purchasePrice) : "",
+    purchasePrice: item ? String(item.purchasePrice) : prefill?.purchasePrice ?? "",
     repairCost: String(item?.repairCost ?? 0),
     salePrice: item?.salePrice === null || item?.salePrice === undefined ? "" : String(item.salePrice),
     imei: item?.imei ?? "",
-    notes: item?.notes ?? "",
+    notes: item?.notes ?? prefill?.notes ?? "",
     purchaseDate: item?.purchaseDate ?? today,
     soldAt: item?.soldAt ?? "",
   };
@@ -68,6 +79,7 @@ async function readJsonSafely(response: Response) {
 export function InventoryForm({
   models,
   item,
+  prefill,
   submitUrl,
   method = "POST",
   submitLabel,
@@ -76,7 +88,10 @@ export function InventoryForm({
   onSuccess,
 }: InventoryFormProps) {
   const router = useRouter();
-  const initialForm = useMemo(() => createInitialForm(models, item), [item, models]);
+  const initialForm = useMemo(
+    () => createInitialForm(models, item, prefill),
+    [item, models, prefill],
+  );
   const [form, setForm] = useState(initialForm);
   const [statusMessage, setStatusMessage] = useState("");
   const [statusTone, setStatusTone] = useState<"success" | "error" | "idle">("idle");

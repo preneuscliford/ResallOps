@@ -34,9 +34,21 @@ export type OpportunityRecord = {
 
 export type OpportunityInsert = Omit<OpportunityRecord, "id">;
 
+export type EbaySearchResult = {
+  title: string;
+  url: string;
+  askingPrice: number;
+  repairEstimate: number;
+  resaleEstimate: number;
+  estimatedMargin: number;
+  score: number;
+  riskLevel: Opportunity["riskLevel"];
+  recommendedAction: Opportunity["recommendedAction"];
+  modelSlug: string | null;
+};
+
 export type SyncResult = {
-  imported: number;
-  skipped: number;
-  totalFetched: number;
   query: string;
+  totalFetched: number;
+  results: EbaySearchResult[];
 };

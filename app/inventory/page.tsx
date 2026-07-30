@@ -6,12 +6,27 @@ import { getInventoryItems, getInventorySummary, getIphoneModels } from "@/lib/i
 
 export const dynamic = "force-dynamic";
 
-export default async function InventoryPage() {
-  const [items, models, stats] = await Promise.all([
+type InventoryPageProps = {
+  searchParams: Promise<{
+    prefillModel?: string;
+    prefillPrice?: string;
+    prefillNotes?: string;
+  }>;
+};
+
+export default async function InventoryPage({ searchParams }: InventoryPageProps) {
+  const [items, models, stats, params] = await Promise.all([
     getInventoryItems(),
     getIphoneModels(),
     getInventorySummary(),
+    searchParams,
   ]);
+
+  const prefill = {
+    modelId: models.find((model) => model.slug === params.prefillModel)?.id,
+    purchasePrice: params.prefillPrice,
+    notes: params.prefillNotes,
+  };
 
   return (
     <main className="page-shell">
@@ -40,14 +55,14 @@ export default async function InventoryPage() {
 
       <DashboardStats stats={stats} />
 
-      <section className="panel">
+      <section className="panel" id="ajouter">
         <div className="section-heading">
           <div>
             <p className="section-kicker">Saisie</p>
             <h2>Ajouter un appareil au stock</h2>
           </div>
         </div>
-        <InventoryForm models={models} />
+        <InventoryForm models={models} prefill={prefill} />
       </section>
 
       <section className="panel inventory-panel">

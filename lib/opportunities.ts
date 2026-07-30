@@ -3,6 +3,7 @@ import { fetchEbayListings, isBulkListing } from "@/lib/collectors/ebay";
 import {
   estimateRepairProfile,
   estimateResaleFromTitle,
+  guessModelSlugFromTitle,
   isEligibleIphoneModel,
 } from "@/lib/market-pricing";
 import { ACQUISITION_BUDGET_MAX, ACQUISITION_BUDGET_MIN } from "@/lib/budget";
@@ -135,47 +136,41 @@ export async function createOpportunity(input: CreateOpportunityInput) {
   return mapOpportunityRecord(data);
 }
 
-export async function syncEbayQuery(query: string): Promise<SyncResult> {
-  const supabase = getSupabaseServerClient();
+export async function searchEbayOpportunities(query: string): Promise<SyncResult> {
   const listings = await fetchEbayListings(query);
-  let imported = 0;
-  let skipped = 0;
 
-  for (const listing of listings) {
-    const { data: existing } = await supabase
-      .from("opportunities")
-      .select("id")
-      .eq("platform", "eBay")
-      .eq("title", listing.title)
-      .eq("asking_price", listing.askingPrice)
-      .maybeSingle();
-
-    if (existing) {
-      skipped += 1;
-      continue;
-    }
-
+  const results = listings.map((listing) => {
     const repairProfile = estimateRepairProfile(`${listing.title} ${listing.subtitle}`);
-
-    await createOpportunity({
+    const resaleEstimate = estimateResaleFromTitle(listing.title);
+    const estimate = estimateOpportunity({
       title: listing.title,
-      platform: "eBay",
-      location: "Import eBay",
       askingPrice: listing.askingPrice,
       repairEstimate: repairProfile.repairEstimate,
-      resaleEstimate: estimateResaleFromTitle(listing.title),
+      resaleEstimate,
       locationScore: 4,
       riskPenalty: repairProfile.riskPenalty,
     });
 
-    imported += 1;
-  }
+    return {
+      title: listing.title,
+      url: listing.url,
+      askingPrice: listing.askingPrice,
+      repairEstimate: repairProfile.repairEstimate,
+      resaleEstimate,
+      estimatedMargin: estimate.estimatedMargin,
+      score: estimate.score,
+      riskLevel: getRiskLevel(estimate.score, repairProfile.riskPenalty),
+      recommendedAction: estimate.recommendation,
+      modelSlug: guessModelSlugFromTitle(listing.title),
+    };
+  });
+
+  results.sort((a, b) => b.score - a.score);
 
   return {
-    imported,
-    skipped,
-    totalFetched: listings.length,
     query,
+    totalFetched: listings.length,
+    results,
   };
 }
 

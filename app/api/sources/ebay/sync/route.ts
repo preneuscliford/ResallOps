@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { syncEbayQuery } from "@/lib/opportunities";
+import { searchEbayOpportunities } from "@/lib/opportunities";
 import { toApiErrorMessage } from "@/lib/api-error";
 
 const syncEbaySchema = z.object({
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await syncEbayQuery(parsed.data.query);
+    const result = await searchEbayOpportunities(parsed.data.query);
     return NextResponse.json({ result });
   } catch (error) {
     return NextResponse.json(
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         error: toApiErrorMessage(
           "POST /api/sources/ebay/sync",
           error,
-          "La synchronisation eBay a echoue.",
+          "La recherche eBay a echoue.",
         ),
       },
       { status: 500 },
